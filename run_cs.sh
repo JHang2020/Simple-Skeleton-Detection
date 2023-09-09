@@ -14,6 +14,8 @@ python main.py linear_evaluation --config config/release/ntu60/linear_eval/linea
 python main.py finetune_evaluation --config config/release/gcn_ntu60/finetune/xsub_joint.yaml
 # Ensemble
 python ensemble_ntu_cs.py
+#detection
+python main.py detection_sw_evaluation --config /mnt/netdisk/zhangjh/Code/skeleton_detection/detection/config/release/gcn_ntu60/finetune/xsub_joint_sliding_window.yaml
 
 #visualize
 #python main.py vis_evaluation --config config/release/ntu60/finetune/xsub_motion.yaml

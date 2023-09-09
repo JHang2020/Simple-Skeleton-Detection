@@ -1,11 +1,14 @@
-work_dir: /mnt/netdisk/zhangjh/Code/CMD-main/checkpoints/pretrain_baseline/pku1_xsub/untrimmed
-weights: /mnt/netdisk/zhangjh/Code/CMD-main/checkpoints/pretrain_baseline/pku1_xsub/checkpoint_0450.pth.tar
-ignore_weights: [linear,recons_decoder,mask_param,classifier,encoder_q.fc, encoder_k, queue,encoder_q_motion,encoder_q_bone,]
-#start_epoch: 60
+work_dir: /mnt/netdisk/zhangjh/Code/PCM_extend/distill_checkpoints/no_infonce/best_pcm/xsub/detection
+weights: /mnt/netdisk/zhangjh/Code/PCM_extend/distill_checkpoints/no_infonce/best_pcm/xsub/checkpoint_0150.pth.tar
+ignore_weights: [clip_queue,shuffle_decoder,mp_prompt,base_prompt,cl_prompt,mix_prompt,mask_prompt,recons_prompt,maskgen,linear,recons_decoder,mask_param,classifier,encoder_q.fc, encoder_k, queue,encoder_q_motion,encoder_q_bone,encoder_r,encoder_l,Queue,]
+rename_weights:
+- encoder_k.encoder_q
+#start_epoch: 0
 #start_iter: 38200
 # feeder
 # feeder
-train_feeder: feeder.ntu_feeder_detect.Feeder_single
+
+train_feeder: feeder.ntu_feeder_detect.Feeder_single_sliding_window
 train_feeder_args:
     data_path: /mnt/netdisk/zhangjh/data/PKU1_Detection/untrimmed/train_data.npy
     input_size: 64
@@ -40,14 +43,14 @@ weight_decay: 0.0
 base_lr: 0.01
 warm_up_epoch: 0
 optimizer: SGD
-step: [30, 55]
+step: [50, 70]
 # training
-device: [2]
-batch_size: 4
-test_batch_size: 3
-num_epoch: 70
+device: [0]
+batch_size: 64
+test_batch_size: 1
+num_epoch: 20
 
 save_interval: -1
-eval_interval: 1
+eval_interval: 5
 
 

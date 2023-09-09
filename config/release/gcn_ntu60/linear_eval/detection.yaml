@@ -1,0 +1,54 @@
+work_dir: /mnt/netdisk/zhangjh/Code/CMD-main/checkpoints/CMD/xsub/detection/linear
+weights: /mnt/netdisk/zhangjh/Code/CMD-main/checkpoints/CMD/xsub/checkpoint_0450.pth.tar
+ignore_weights: [linear,recons_decoder,mask_param,classifier,encoder_q.fc, encoder_k, queue,encoder_q_motion,encoder_q_bone,]
+#start_epoch: 60
+#start_iter: 38200
+# feeder
+# feeder
+train_feeder: feeder.ntu_feeder_detect.Feeder_single
+train_feeder_args:
+    data_path: /mnt/netdisk/zhangjh/data/PKU1_Detection/train_data.npy
+    input_size: 64
+    l_ratio:
+    - 0.5
+    - 1.0
+    label_path: /mnt/netdisk/zhangjh/data/PKU1_Detection/train_label.npy
+    start_pos_path: /mnt/netdisk/zhangjh/data/PKU1_Detection/val_start_list.txt
+    video_name_path: /mnt/netdisk/zhangjh/data/PKU1_Detection/val_video_name.txt
+    num_frame_path: /mnt/netdisk/linlilang/SkeletonContrast/data/NTU-RGB-D-60-AGCN/xsub/train_num_frame.npy
+ 
+test_feeder: feeder.ntu_feeder_detect.Feeder_single
+test_feeder_args:
+    data_path: /mnt/netdisk/zhangjh/data/PKU1_Detection/val_data.npy
+    input_size: 64
+    l_ratio:
+    - 0.95
+    label_path: /mnt/netdisk/zhangjh/data/PKU1_Detection/val_label.npy
+    start_pos_path: /mnt/netdisk/zhangjh/data/PKU1_Detection/val_start_list.txt
+    video_name_path: /mnt/netdisk/zhangjh/data/PKU1_Detection/val_video_name.txt
+    num_frame_path: /mnt/netdisk/linlilang/SkeletonContrast/data/NTU-RGB-D-60-AGCN/xsub/train_num_frame.npy
+
+
+# model
+model: net.detection_baseline.GRU_Detect
+model_args:
+  hidden_size: 1024
+  num_class: 53
+
+#optim
+nesterov: False
+weight_decay: 0.0
+base_lr: 0.1
+warm_up_epoch: 0
+optimizer: SGD
+step: [30, 55]
+# training
+device: [0]
+batch_size: 512
+test_batch_size: 512
+num_epoch: 70
+
+save_interval: -1
+eval_interval: 1
+
+

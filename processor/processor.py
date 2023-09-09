@@ -205,11 +205,7 @@ class Processor(IO):
                         filename = 'best_model.pt'
                         self.io.save_model(self.model, filename)
                         # save the output of model
-                        if self.arg.save_result:
-                            result_dict = dict(
-                                zip(self.data_loader['test'].dataset.sample_name,
-                                    self.result))
-                            self.io.save_pkl(result_dict, 'test_result.pkl')
+                        
 
         # test phase
         elif self.arg.phase == 'test':
@@ -261,13 +257,14 @@ class Processor(IO):
         # feeder
         parser.add_argument('--train_feeder', default='feeder.feeder', help='train data loader will be used')
         parser.add_argument('--test_feeder', default='feeder.feeder', help='test data loader will be used')
-        parser.add_argument('--num_worker', type=int, default=4, help='the number of worker per gpu for data loader')
+        parser.add_argument('--num_worker', type=int, default=8, help='the number of worker per gpu for data loader')
         parser.add_argument('--train_feeder_args', action=DictAction, default=dict(), help='the arguments of data loader for training')
         parser.add_argument('--test_feeder_args', action=DictAction, default=dict(), help='the arguments of data loader for test')
         parser.add_argument('--batch_size', type=int, default=256, help='training batch size')
         parser.add_argument('--test_batch_size', type=int, default=256, help='test batch size')
         parser.add_argument('--debug', action="store_true", help='less data, faster loading')
-
+        parser.add_argument('--rename_weights', type=str, default=[], nargs='+', help='the name of weights which will be ignored in the initialization')
+        
         # model
         parser.add_argument('--model', default=None, help='the model will be used')
         parser.add_argument('--model_args', action=DictAction, default=dict(), help='the arguments of model')

@@ -8,6 +8,7 @@ import warnings
 import pickle
 from collections import OrderedDict
 import yaml
+import copy
 import numpy as np
 # torch
 import torch
@@ -54,35 +55,61 @@ class IO():
         self.model_text += '\n\n' + str(model)
         return model
 
-    def load_weights(self, model, weights_path, ignore_weights=None):
+    def load_weights(self, model, weights_path, ignore_weights=None,rename_weights=None,load_stu=True):
         if ignore_weights is None:
             ignore_weights = []
         if isinstance(ignore_weights, str):
             ignore_weights = [ignore_weights]
+        
+        if rename_weights is None:
+            rename_weights = []
+        if isinstance(rename_weights, str):
+            rename_weights = [rename_weights]
 
         self.print_log('Load weights from {}.'.format(weights_path))
-        weights = torch.load(weights_path)
+        weights = torch.load(weights_path,map_location='cpu')
+        if 'state_dict' in weights.keys():
+            weights = weights['state_dict']
+
         weights = OrderedDict([[k.split('module.')[-1],
                                 v.cpu()] for k, v in weights.items()])
 
+        for r in rename_weights:
+            i, j = r.split(".")
+            rename_name = list()
+            for w in weights:
+                if w.find(i) == 0:
+                    rename_name.append(w)
+            for n in rename_name:
+                weights[n.replace(i, j)] = copy.deepcopy(weights[n])
+                self.print_log('Repalce [{}] weights with [{}].'.format(n.replace(i, j), n))
+        
         # filter weights
         for i in ignore_weights:
             ignore_name = list()
             for w in weights:
                 if w.find(i) == 0:
                     ignore_name.append(w)
-
             for n in ignore_name:
                 weights.pop(n)
                 self.print_log('Filter [{}] remove weights [{}].'.format(i,n))
+        if 'mask_param' in weights.keys() and not 'mask_param' in model.state_dict().keys():
+            weights.pop('mask_param')
+        
+        k_list = list(weights.keys()).copy()
+        for k in k_list:
+            if 'edge_importance.' in k:
+                weights[k[:len('encoder_q.edge_importance')]+str(int(k[len('encoder_q.edge_importance.'):])+1)] = weights[k]
+                weights.pop(k)
+        
+        k_list = list(weights.keys()).copy()
+        for w in k_list:
+            if not load_stu and w.find('encoder_q')==0:
+                weights.pop(w)
+                self.print_log('Filter encoder_q remove weights [{}].'.format(w))             
+            else:
+                self.print_log('Load weights [{}].'.format(w))
 
-        for key in list(weights.keys()):
-            if "encoder_q.edge_importance." in key:
-                weights[key[:-2]+str(int(key[-1])+1)] = weights[key]
-                weights.pop(key)
-
-        for w in weights:
-            self.print_log('Load weights [{}].'.format(w))
         try:
             model.load_state_dict(weights)
         except (KeyError, RuntimeError):
@@ -90,8 +117,6 @@ class IO():
             diff = list(set(state.keys()).difference(set(weights.keys())))
             for d in diff:
                 self.print_log('Can not find weights [{}].'.format(d))
-            if 'mask_param' in weights.keys():
-                weights.pop('mask_param')
             state.update(weights)
             model.load_state_dict(state)
         return model

@@ -64,14 +64,11 @@ class IO():
         else:
             self.dev = "cpu"
 
-    def load_model(self):
-        self.model = self.io.load_model(self.arg.model,
-                                        **(self.arg.model_args))
-
     def load_weights(self):
+        print(self.arg.rename_weights)
         if self.arg.weights:
             self.model = self.io.load_weights(self.model, self.arg.weights,
-                                              self.arg.ignore_weights)
+                                              self.arg.ignore_weights,self.arg.rename_weights)
 
     def gpu(self):
         # move modules to gpu

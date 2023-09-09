@@ -54,18 +54,33 @@ class IO():
         self.model_text += '\n\n' + str(model)
         return model
 
-    def load_weights(self, model, weights_path, ignore_weights=None):
+    def load_weights(self, model, weights_path, ignore_weights=None,rename_weights=None):
         if ignore_weights is None:
             ignore_weights = []
         if isinstance(ignore_weights, str):
             ignore_weights = [ignore_weights]
+        
+        if rename_weights is None:
+            rename_weights = []
+        if isinstance(rename_weights, str):
+            rename_weights = [rename_weights]
 
-        self.print_log('Load weights from {}.'.format(weights_path))
+        print('Load weights from {}.'.format(weights_path))
         weights = torch.load(weights_path)
         weights = OrderedDict([[k.split('module.')[-1],
                                 v.cpu()] for k, v in weights.items()])
 
         # filter weights
+        
+        for r in rename_weights:
+            i, j = r.split(".")
+            rename_name = list()
+            for w in weights:
+                if w.find(i) == 0:
+                    rename_name.append(w)
+            for n in rename_name:
+                weights[n.replace(i, j)] = copy.deepcopy(weights[n])
+                self.print_log('Repalce [{}] weights with [{}].'.format(n.replace(i, j), n))
         for i in ignore_weights:
             ignore_name = list()
             for w in weights:
@@ -74,9 +89,9 @@ class IO():
             for n in ignore_name:
                 weights.pop(n)
                 self.print_log('Filter [{}] remove weights [{}].'.format(i,n))
-
+                
         for w in weights:
-            self.print_log('Load weights [{}].'.format(w))
+            print('Load weights [{}].'.format(w))
 
         try:
             model.load_state_dict(weights)
