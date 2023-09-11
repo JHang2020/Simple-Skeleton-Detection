@@ -203,8 +203,10 @@ class DT_Processor(Processor):
             gt_dict[vid_name] = labels
             res_dict[vid_name] = pred_labels
 
-
-        metrics = eval_detect_mAP(gt_dict, res_dict, minoverlap=0.5)
+        for thresh in [0.1, 0.3, 0.5]:
+            metrics = eval_detect_mAP(gt_dict, res_dict, minoverlap=thresh)
+            print('thresh: ',thresh, metrics['map'])
+        
         self.current_result = metrics['map']
         self.best_result = max(self.best_result,self.current_result)
         print (metrics['map'])

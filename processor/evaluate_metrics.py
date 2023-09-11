@@ -213,7 +213,7 @@ def eval_detect_mAP(gt_dict, res_dict, minoverlap=0.5):
 
     metrics['map'] = np.mean(np.array(res_map))
     # metrics['f1'] = np.mean(np.array(res_f1))
-    print(metrics)
+    #print(metrics)
     print('action class number is',len(classes))
     return metrics
 
@@ -279,6 +279,47 @@ def get_interval_frm_frame_predict(prob_seq,  win_lg=15, win_sm=2, rate_min=0.1)
             idx = idx + 1
     pred_labels = np.array(pred_labels)
     return pred_labels
+
+def get_segments(scores, activity_threshold):
+  """Get prediction segments of a video."""
+  # Each segment contains start, end, class, confidence score.
+  # Sum of all probabilities (1 - probability of no-activity)
+  activity_prob = 1 - scores[:, 0]
+  # Binary vector indicating whether a clip is an activity or no-activity
+  activity_tag = np.zeros(activity_prob.shape, dtype=np.int32)
+  activity_tag[activity_prob >= activity_threshold] = 1
+  assert activity_tag.ndim == 1
+  # For each index, subtract the previous index, getting -1, 0, or 1
+  # 1 indicates the start of a segment, and -1 indicates the end.
+  padded = np.pad(activity_tag, pad_width=1, mode='constant')
+  diff = padded[1:] - padded[:-1]
+  indexes = np.arange(diff.size)
+  startings = indexes[diff == 1]
+  endings = indexes[diff == -1]
+  assert startings.size == endings.size
+
+  segments = []
+  for start, end in zip(startings, endings):
+    segment_scores = scores[start:end, :]
+    class_prob = np.mean(segment_scores, axis=0)
+    segment_class_index = np.argmax(class_prob[1:]) + 1
+    confidence = np.mean(segment_scores[:, segment_class_index])
+    segments.append((segment_class_index, start, end, confidence))
+  return np.array(segments)
+
+def smoothing(x, k=5):
+    ''' Applies a mean filter to an input sequence. The k value specifies the window
+    size. window size = 2*k
+    '''
+    l = len(x)
+    s = np.arange(-k, l - k)
+    e = np.arange(k, l + k)
+    s[s < 0] = 0
+    e[e >= l] = l - 1
+    y = np.zeros(x.shape)
+    for i in range(l):
+        y[i] = np.mean(x[s[i]:e[i]], axis=0)
+    return y
 
 if __name__ == '__main__':
     #输入是pred

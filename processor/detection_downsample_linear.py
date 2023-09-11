@@ -100,7 +100,7 @@ def sliding_window_crop_downsample(input_data,label,window_size=32, downsample=1
     new_label = torch.stack(new_label,dim=0)#N*length
 
     for i in range(5):
-        assert new_data.shape[i] == (N*length, window_size, V,C,M)[i]
+        assert new_data.shape[i] == (N*length, window_size//downsample, V,C,M)[i]
 
     return new_data, new_label
 
@@ -113,23 +113,32 @@ class DT_Processor(Processor):
         self.model = self.io.load_model(self.arg.model,
                                         **(self.arg.model_args))
         self.model.apply(weights_init)
-        self.loss = nn.CrossEntropyLoss(ignore_index=255)
+
+        for name, param in self.model.encoder_q.named_parameters():
+            if name not in ['fc.weight', 'fc.bias']:
+                param.requires_grad = False
+        self.num_grad_layers = 2
+
+        self.loss = nn.CrossEntropyLoss()
         
     def load_optimizer(self):
+        parameters = list(filter(lambda p: p.requires_grad, self.model.parameters()))
+        assert len(parameters) == self.num_grad_layers
         if self.arg.optimizer == 'SGD':
             self.optimizer = optim.SGD(
-                self.model.parameters(),
+                parameters,
                 lr=self.arg.base_lr,
                 momentum=0.9,
                 nesterov=self.arg.nesterov,
                 weight_decay=self.arg.weight_decay)
         elif self.arg.optimizer == 'Adam':
             self.optimizer = optim.Adam(
-                self.model.parameters(),
+                parameters,
                 lr=self.arg.base_lr,
                 weight_decay=self.arg.weight_decay)
         else:
             raise ValueError()
+    
     def show_best(self, k):
         rank = self.result.argsort()
         hit_top_k = [l in rank[i, -k:] for i, l in enumerate(self.label)]
@@ -226,17 +235,17 @@ class DT_Processor(Processor):
         sfm = nn.Softmax(dim=-1)
         count = 0
         for data, label,start_pos,video_name in process:
-            #with open ('1.txt','w') as f:
-            #    l = label[0].shape[0]
-            #    for i in range(l):
-            #        f.write(str(int(label[0][i].cpu().numpy()))+'\n')
+            with open ('1.txt','w') as f:
+                l = label[0].shape[0]
+                for i in range(l):
+                    f.write(str(int(label[0][i].cpu().numpy()))+'\n')
             #time.sleep(1000)
             # get data
             N,T,V,C,M = data.shape
             data = data.float().to(self.dev)
             label = label.long().to(self.dev)
             assert data.shape[0] == 1 # only process per video once time
-            data, label = sliding_window_crop(data,label)
+            data, label = sliding_window_crop_downsample(data,label,window_size=16,downsample=4)
             length = data.shape[0]//N
 
             # inference      
@@ -252,13 +261,16 @@ class DT_Processor(Processor):
             padd_output[:,:length,:] = output
             padd_output[:,length:,0] = 1.0 
             ####
-            pre_o = get_interval_frm_frame_predict(padd_output.cpu().numpy())
-            print((padd_output.argmax(dim=2)[0,:length].cpu()==label.cpu()).float().mean())
-            print(pre_o)
-            #with open ('2.txt','w') as f:
-            #    a = padd_output.argmax(dim=2)
-            #    for i in range(l):
-            #        f.write(str(a[0][i].cpu().numpy())+'\n')
+            pre_o = get_interval_frm_frame_predict(padd_output[0].cpu().numpy())
+            #print((padd_output.argmax(dim=2)[0,:length].cpu()==label.cpu()).float().mean())
+            #print(pre_o)
+            with open ('2.txt','w') as f:
+                #a = padd_output.argmax(dim=2)
+                #for i in range(l):
+                #    f.write(str(a[0][i].cpu().numpy())+'\n')
+                for i in pre_o:
+                    f.write(str(i)+'\n')
+
             
             #time.sleep(100)
             
@@ -280,9 +292,14 @@ class DT_Processor(Processor):
         # print vid_name, prob_seq.shape
         for idx in range(len(video_name_frag)):
             prob_val = prob_seq[idx].cpu().numpy()
-            pred_labels = get_interval_frm_frame_predict(prob_val)
-            #if len(pred_labels)==0:
-            #    print('!')
+            prob_smooth = smoothing(prob_val[:,:label_frag[idx].shape[1]],10)
+            
+            #TIP sliding window method
+            #pred_labels = get_interval_frm_frame_predict(prob_val[:,:label_frag[idx].shape[1]])
+
+            #cvprw naive methods
+            pred_labels = get_segments(prob_smooth, activity_threshold=0.4)
+            #print(pred_labels)
             
             vid_name = video_name_frag[idx]
 
@@ -307,7 +324,11 @@ class DT_Processor(Processor):
 
         mapv = sum([ap(res_video_dict[x], 0.5, gt_video_dict[x]) for x in range(len(res_video_dict))])/len(res_video_dict)
 
-        metrics = eval_detect_mAP(gt_dict, res_dict, minoverlap=0.5)
+        for thresh in [0.1, 0.3, 0.5]:
+            metrics = eval_detect_mAP(gt_dict, res_dict, minoverlap=thresh)
+            print('thresh: ',thresh, metrics['map'])
+            a = metrics['map']
+            self.io.print_log(f'thresh: {thresh}, {a}')
         self.current_result = metrics['map']*100
         self.best_result = max(self.best_result,self.current_result)
         print (metrics['map'])

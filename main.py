@@ -36,7 +36,8 @@ if __name__ == '__main__':
     processors['pretrain_hiclr'] = import_class('processor.pretrain_hiclr.HiCLR_Processor')
     processors['linear_evaluation'] = import_class('processor.linear_evaluation.LE_Processor')
     processors['finetune_evaluation'] = import_class('processor.finetune_evaluation.FT_Processor')
-    processors['detection_evaluation'] = import_class('processor.detection_evaluation_untrimmed.DT_Processor')
+    processors['detection_ds_evaluation'] = import_class('processor.detection_downsample.DT_Processor')
+    processors['detection_ds_linear_evaluation'] = import_class('processor.detection_downsample_linear.DT_Processor')
     processors['detection_sw_evaluation'] = import_class('processor.detection_evaluation_untrimmed_sliding_window.DT_Processor')
     processors['linear_detection_evaluation'] = import_class('processor.linear_detection_evaluation.DT_Processor')
     

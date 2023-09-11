@@ -9,6 +9,7 @@ import numpy as np
 np.set_printoptions(threshold=np.inf)
 import random
 import json
+import os
 from . import tools
 try:
     from feeder import augmentations
@@ -361,7 +362,7 @@ class Feeder_single_sliding_window_downsample(torch.utils.data.Dataset):
         self.input_size=input_size
         self.input_representation=input_representation
         self.l_ratio = l_ratio
-        self.downsample = 3
+        self.downsample = 4
         self.load_data(mmap)
         self.N, self.C, self.T, self.V, self.M = self.data.shape
         print("l_ratio",self.l_ratio)
@@ -394,11 +395,14 @@ class Feeder_single_sliding_window_downsample(torch.utils.data.Dataset):
         return self
 
     def __getitem__(self, index):
+        
+        self.downsample = random.randint(3,5)
+
         index = index%self.N
         # get raw input
         # input: C, T, V, M
         data_numpy = np.array(self.data[index])
-        window_size = 32
+        window_size = 16 * self.downsample
        
         label = self.label[index]
         if len(self.label) > 6500:
@@ -407,7 +411,10 @@ class Feeder_single_sliding_window_downsample(torch.utils.data.Dataset):
         else:
             start_pos = self.start_pos_path[index]
             video_name = self.video_name_path[index]
-
+        
+        label_path = '/mnt/netdisk/Datasets/088-PKUMMD/PKUMMDv1/Train_Label_PKU_final/'
+        label_quad = np.loadtxt(os.path.join(label_path, video_name.strip()+'.txt'),delimiter=',').astype(int)#T,4 (label,start,end,confidence)
+        
         input_data = data_numpy
         #255只会在label的最后以占位符的形式出现
         length = (label.astype(int)!=255).astype(float).sum()
@@ -428,7 +435,17 @@ class Feeder_single_sliding_window_downsample(torch.utils.data.Dataset):
         #label = 255: no skeletons -> empty frames
         sample_s = int(sample_s)
         sample_e = int(sample_e)
-        return input_data[sample_s:sample_e], label[(sample_s+sample_e)//2],start_pos,video_name.strip()
+
+        target = 0 #获取overlap最大的clip的label
+        max_ratio = 0.5
+        for action_id, start_frame, end_frame, _ in label_quad:
+            overlap = get_overlap([sample_s, sample_e - 1],
+                                [start_frame, end_frame - 1])
+            ratio = overlap / (sample_e - sample_s)
+            if ratio > max_ratio:
+                target = int(action_id+1)
+        
+        return input_data[sample_s:sample_e:self.downsample], label[(sample_s+sample_e)//2], start_pos,video_name.strip()
 
 
     def basic_aug(self, data_numpy,number_of_frames):
@@ -442,7 +459,10 @@ class Feeder_single_sliding_window_downsample(torch.utils.data.Dataset):
                  data_numpy_v2 = augmentations.pose_augmentation(data_numpy_v2_crop)
         
         return data_numpy_v2
-        
+
+def get_overlap(a, b):
+    return max(0, min(a[1], b[1]) - max(a[0], b[0]))
+
 class Feeder_single_eccv(torch.utils.data.Dataset):
     """ 
     Arguments:

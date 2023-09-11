@@ -9,6 +9,7 @@ from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import time
 import torch.nn.functional as F
 # torchlight
 import torchlight.torchlight as torchlight
@@ -17,7 +18,7 @@ from torchlight.torchlight import DictAction
 from torchlight.torchlight import import_class
 from .evaluate_metrics import *
 from .processor import Processor
-from metrics_eccv18_lff import calc_map
+
 
 def weights_init(m):
     classname = m.__class__.__name__
@@ -64,6 +65,42 @@ def sliding_window_crop(input_data,label,window_size=32):
 
     for i in range(5):
         assert new_data.shape[i] == (N*length, window_size, V,C,M)[i]
+
+    return new_data, new_label
+
+def sliding_window_crop_downsample(input_data,label,window_size=32, downsample=1):
+    '''
+    window_size=32 ~ 1second for pkummd dataset
+    '''
+    N,T,V,C,M = input_data.shape
+    window_size = window_size * downsample 
+    assert N==1 #only process each video at a time 
+    #target dim: N*T, window_size, V,C,M 
+    new_data = []
+    new_label = []
+    for i in range(N):
+        label_mask = (label!=255)
+        length = label_mask.float().sum()
+        for t in range(int(length)):
+            sample_s = t
+            if sample_s<window_size//2:
+                sample_s = 0
+                sample_e = window_size
+            elif sample_s>length-(window_size//2):
+                sample_s = length-window_size
+                sample_e = length
+            else:
+                sample_s = sample_s - (window_size//2)
+                sample_e = sample_s +  window_size
+            sample_s = int(sample_s)
+            sample_e = int(sample_e)
+            new_data.append(input_data[i][sample_s:sample_e:downsample]) # window_size, V,C,M
+            new_label.append(label[i][t])
+    new_data = torch.stack(new_data,dim=0)#N*length, window_size, V,C,M
+    new_label = torch.stack(new_label,dim=0)#N*length
+
+    for i in range(5):
+        assert new_data.shape[i] == (N*length, window_size//downsample, V,C,M)[i]
 
     return new_data, new_label
 
@@ -134,6 +171,7 @@ class DT_Processor(Processor):
         for data, label, start_pos, video_name in process:
             
             # get data
+            #print(label.max(),label.min())
             data = data.float().to(self.dev)
             label = label.long().to(self.dev)#N,T
             
@@ -188,13 +226,17 @@ class DT_Processor(Processor):
         sfm = nn.Softmax(dim=-1)
         count = 0
         for data, label,start_pos,video_name in process:
-
+            with open ('1.txt','w') as f:
+                l = label[0].shape[0]
+                for i in range(l):
+                    f.write(str(int(label[0][i].cpu().numpy()))+'\n')
+            #time.sleep(1000)
             # get data
             N,T,V,C,M = data.shape
             data = data.float().to(self.dev)
             label = label.long().to(self.dev)
             assert data.shape[0] == 1 # only process per video once time
-            data, label = sliding_window_crop(data,label)
+            data, label = sliding_window_crop_downsample(data,label,window_size=16,downsample=4)
             length = data.shape[0]//N
 
             # inference      
@@ -206,17 +248,31 @@ class DT_Processor(Processor):
                 #out4loss = output.reshape(N*T,-1)
                 #loss = self.loss(out4loss, label.reshape(N*T,))
             output = sfm(output)#N,length,C
-            padd_output = torch.zeros(N,length,output.shape[2])
-            padd_output[:,:length,:] = padd_output
+            padd_output = torch.zeros(N,9000,output.shape[2])
+            padd_output[:,:length,:] = output
+            padd_output[:,length:,0] = 1.0 
+            ####
+            pre_o = get_interval_frm_frame_predict(padd_output[0].cpu().numpy())
+            #print((padd_output.argmax(dim=2)[0,:length].cpu()==label.cpu()).float().mean())
+            #print(pre_o)
+            with open ('2.txt','w') as f:
+                #a = padd_output.argmax(dim=2)
+                #for i in range(l):
+                #    f.write(str(a[0][i].cpu().numpy())+'\n')
+                for i in pre_o:
+                    f.write(str(i)+'\n')
 
+            
+            #time.sleep(100)
+            
             result_frag.append(padd_output.clone())
             label_frag.append(label)
             start_frag = start_frag + start_pos.cpu().numpy().tolist()
             #print(video_name)
             video_name_frag = video_name_frag + list(video_name)
         
-        start_list = np.array(start_frag).astype(int)
-        prob_seq = result_frag
+        #start_list = np.array(start_frag).astype(int)
+        prob_seq = torch.cat(result_frag,dim=0)
         
         gt_dict = {}
         res_dict = {}
@@ -227,14 +283,22 @@ class DT_Processor(Processor):
         # print vid_name, prob_seq.shape
         for idx in range(len(video_name_frag)):
             prob_val = prob_seq[idx].cpu().numpy()
-            pred_labels = calc_map(prob_val) 
+            prob_smooth = smoothing(prob_val[:,:label_frag[idx].shape[1]],10)
+            
+            #TIP sliding window method
+            #pred_labels = get_interval_frm_frame_predict(prob_val[:,:label_frag[idx].shape[1]])
+
+            #cvprw naive methods
+            pred_labels = get_segments(prob_smooth, activity_threshold=0.4)
+            #print(pred_labels)
+            
             vid_name = video_name_frag[idx]
 
             label_path = '/mnt/netdisk/Datasets/088-PKUMMD/PKUMMDv1/Train_Label_PKU_final/'
             labels = np.loadtxt(os.path.join(label_path, vid_name+'.txt'),delimiter=',').astype(int)#T,4 (label,start,end,confidence)
             # NOTE: for ground truth, action labels starts from 0, but for our detection, 0 indicates empty action
             labels[:,0] = labels[:,0] + 1
-            
+
             gt_dict[vid_name] = labels
             res_dict[vid_name] = pred_labels
             
@@ -251,7 +315,11 @@ class DT_Processor(Processor):
 
         mapv = sum([ap(res_video_dict[x], 0.5, gt_video_dict[x]) for x in range(len(res_video_dict))])/len(res_video_dict)
 
-        metrics = eval_detect_mAP(gt_dict, res_dict, minoverlap=0.5)
+        for thresh in [0.1, 0.3, 0.5]:
+            metrics = eval_detect_mAP(gt_dict, res_dict, minoverlap=thresh)
+            print('thresh: ',thresh, metrics['map'])
+            a = metrics['map']
+            self.io.print_log(f'thresh: {thresh}, {a}')
         self.current_result = metrics['map']*100
         self.best_result = max(self.best_result,self.current_result)
         print (metrics['map'])

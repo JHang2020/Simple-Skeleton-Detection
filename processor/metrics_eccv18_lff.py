@@ -43,7 +43,7 @@ def get_segments(scores, activity_threshold):
     class_prob = np.mean(segment_scores, axis=0)
     segment_class_index = np.argmax(class_prob[1:]) + 1
     confidence = np.mean(segment_scores[:, segment_class_index])
-    segments.append((start, end, segment_class_index, confidence))
+    segments.append((segment_class_index, start, end, confidence))
   return segments
 
 
@@ -61,7 +61,7 @@ def calc_map(opt, video_scores, video_names, groundtruth_dir, iou_thresholds):
 
     prop = []
     for segment in segments:
-      start, end, cls, score = segment
+      cls, start, end, score = segment
       # start, end are indices of clips. Transform to frame index.
       start_index = start * 10 * 10 # downsample
       end_index = (
