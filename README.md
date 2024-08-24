@@ -1,4 +1,4 @@
-# HiCLR
+# Simple CodeBase for Skeleton Action Detection Evaluation
 This is an repo for skeleton-based action detection, used for the evalution of the self-supervised models, e.g., [HiCLR](https://github.com/JHang2020/HiCLR), [PCM3](https://github.com/JHang2020/PCM3). 
 
 ## Dataset
