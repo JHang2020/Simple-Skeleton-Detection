@@ -1,6 +1,6 @@
-work_dir: /mnt/netdisk/zhangjh/Code/CMD-main/mask_checkpoints/both_prompt_128*2_sgenc/xsub/detection_linear
-weights: /mnt/netdisk/zhangjh/Code/CMD-main/mask_checkpoints/both_prompt_128*2_sgenc/xsub/checkpoint_0450.pth.tar
-ignore_weights: [clip_queue,shuffle_decoder,mp_prompt,base_prompt,cl_prompt,mix_prompt,mask_prompt,recons_prompt,maskgen,linear,recons_decoder,mask_param,classifier,encoder_q.fc, encoder_k, queue,encoder_q_motion,encoder_q_bone,encoder_r,encoder_l,Queue,]
+work_dir: /mnt/netdisk/zhangjh/Code/CMD-main/checkpoints/pretrain_onlymix_nokl/linear_detection
+weights: /mnt/netdisk/zhangjh/Code/CMD-main/checkpoints/pretrain_onlymix_nokl/checkpoint_0450.pth.tar
+ignore_weights: [base_prompt, clip_queue,shuffle_decoder,mp_prompt,cl_prompt,mix_prompt,mask_prompt,recons_prompt,maskgen,linear,recons_decoder,mask_param,classifier,encoder_q.fc, encoder_k, queue,encoder_q_motion,encoder_q_bone,encoder_r,encoder_l,Queue,]
 rename_weights:
 #- encoder_k.encoder_q
 #start_epoch: 0
@@ -45,7 +45,7 @@ warm_up_epoch: 0
 optimizer: SGD
 step: [40]
 # training
-device: [0]
+device: [1]
 batch_size: 64
 test_batch_size: 1
 num_epoch: 60

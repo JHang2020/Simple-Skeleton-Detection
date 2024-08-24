@@ -1,3 +1,16 @@
 work_dir/
 .work_dir/
 .fig/
+detection/1_ft.txt
+detection/1_ln.txt
+detection/1.txt
+detection/2_ft.txt
+detection/2_ln.txt
+detection/2.txt
+detection/ensemble_ntu_cs.py
+detection/ensemble_ntu_cv.py
+detection/ensemble_pkup1cs.py
+detection/LICENSE
+detection/README.md
+detection/run_cs.sh
+detection/run_cv.sh

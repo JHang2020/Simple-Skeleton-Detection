@@ -115,7 +115,7 @@ class DT_Processor(Processor):
         self.model.apply(weights_init)
 
         for name, param in self.model.encoder_q.named_parameters():
-            if name not in ['fc.weight', 'fc.bias']:
+            if name not in ['fc.weight', 'fc.bias', 'encoder_q.fc.weight', 'encoder_q.fc.bias']:
                 param.requires_grad = False
         self.num_grad_layers = 2
 
@@ -123,6 +123,7 @@ class DT_Processor(Processor):
         
     def load_optimizer(self):
         parameters = list(filter(lambda p: p.requires_grad, self.model.parameters()))
+        #print()
         assert len(parameters) == self.num_grad_layers
         if self.arg.optimizer == 'SGD':
             self.optimizer = optim.SGD(
@@ -171,6 +172,7 @@ class DT_Processor(Processor):
         self.io.print_log('\tTop{}: {:.2f}%'.format(k, 100 * accuracy))
     
     def train(self,epoch):
+        #return 
         self.model.train()
         #return
         self.adjust_lr()
@@ -224,6 +226,9 @@ class DT_Processor(Processor):
         return group_list, vid_list_uqk
 
     def test(self, epoch):
+        #self.current_result = 0.0
+        #self.best_result = 0.0
+        #return
         self.model.eval()
         loader = self.data_loader['test']
         loss_value = []
@@ -290,6 +295,7 @@ class DT_Processor(Processor):
         res_video_dict = []#mapv
 
         # print vid_name, prob_seq.shape
+        filtered = False #drop some predictions with intervals less than 20
         for idx in range(len(video_name_frag)):
             prob_val = prob_seq[idx].cpu().numpy()
             prob_smooth = smoothing(prob_val[:,:label_frag[idx].shape[1]],10)
@@ -299,6 +305,13 @@ class DT_Processor(Processor):
 
             #cvprw naive methods
             pred_labels = get_segments(prob_smooth, activity_threshold=0.4)
+            pred_label_filted = []
+            if filtered:
+                for i in range(pred_labels.shape[0]):
+                    s,e = pred_labels[i][1:3]
+                    if e-s>=15:
+                        pred_label_filted.append(pred_labels[i])
+                pred_labels = np.array(pred_label_filted)
             #print(pred_labels)
             
             vid_name = video_name_frag[idx]
@@ -325,13 +338,13 @@ class DT_Processor(Processor):
         mapv = sum([ap(res_video_dict[x], 0.5, gt_video_dict[x]) for x in range(len(res_video_dict))])/len(res_video_dict)
 
         for thresh in [0.1, 0.3, 0.5]:
-            metrics = eval_detect_mAP(gt_dict, res_dict, minoverlap=thresh)
+            metrics = eval_detect_mAP(gt_dict, res_dict, minoverlap=thresh)#mapa
             print('thresh: ',thresh, metrics['map'])
             a = metrics['map']
             self.io.print_log(f'thresh: {thresh}, {a}')
         self.current_result = metrics['map']*100
         self.best_result = max(self.best_result,self.current_result)
-        print (metrics['map'])
+        print ('mapa', metrics['map'])
         print('mapv', mapv)
 
 

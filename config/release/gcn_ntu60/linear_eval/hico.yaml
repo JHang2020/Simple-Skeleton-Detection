@@ -1,8 +1,8 @@
-work_dir: /mnt/netdisk/zhangjh/Code/PCM_extend/distill_checkpoints/no_infonce/best_pcm/xsub/tmp
-weights: #/mnt/netdisk/zhangjh/Code/PCM_extend/distill_checkpoints/no_infonce/best_pcm/xsub/checkpoint_0150.pth.tar
-ignore_weights: [clip_queue,shuffle_decoder,mp_prompt,base_prompt,cl_prompt,mix_prompt,mask_prompt,recons_prompt,maskgen,linear,recons_decoder,mask_param,classifier,encoder_q.fc, encoder_k, queue,encoder_q_motion,encoder_q_bone,encoder_r,encoder_l,Queue,]
+work_dir: /mnt/netdisk/zhangjh/Code/HiCLR_DDP/work_dir/hico/linear_detection
+weights: /mnt/netdisk/zhangjh/Code/HiCLR_DDP/work_dir/hico/linear_detection/epoch060_acc0.00_model.pt
+ignore_weights: #[c_queue,p_queue,i_queue,t_queue,s_queue,encoder_q.clip_proj,encoder_q.part_proj,encoder_q.instance_proj,encoder_q.td_proj,encoder_q.sd_proj,cl_prompt, mp_prompt,clip_queue, shuffle_decoder,maskgen,automix, recons_decoder,linear,pos_enc, predictor,classifier, aug_info, encoder_q.fc, encoder_q.predictor, encoder_k, queue,encoder_q_motion,encoder_q_bone,encoder_r,encoder_l,Queue]
 rename_weights:
-- encoder_k.encoder_q
+#- encoder_k.encoder_q
 #start_epoch: 0
 #start_iter: 38200
 # feeder
@@ -33,9 +33,19 @@ test_feeder_args:
 
 
 # model
-model: net.detection_baseline.GRU_Detect
+model: net.detection_baseline.GRU_Detect_hico
 model_args:
-  hidden_size: 1024
+  t_input_size: 150
+  s_input_size: 192
+  kernel_size: 5 
+  stride: 1 
+  padding: 2 
+  factor: 2
+  hidden_size: 512
+  num_head: 4
+  num_layer: 1
+  granularity: 4
+  encoder: "GRU"
   num_class: 53
 
 #optim
@@ -43,14 +53,14 @@ weight_decay: 0.0
 base_lr: 0.01
 warm_up_epoch: 0
 optimizer: SGD
-step: [50]
+step: [40]
 # training
-device: [9]
+device: [1]
 batch_size: 64
 test_batch_size: 1
 num_epoch: 60
 
 save_interval: -1
-eval_interval: 5
+eval_interval: 60
 
 
